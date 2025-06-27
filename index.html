@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loading...</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            background-color: #f0f2f5; /* 更柔和的背景色 */
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        .container {
+            flex-grow: 1;
+            width: 90%;
+            max-width: 900px; /* 稍微加寬以容納新聞 */
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #ffffff;
+            border-radius: 10px;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.08);
+        }
+        header {
+            border-bottom: 1px solid #e9ecef;
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+            text-align: center;
+        }
+        header h1 {
+            color: #0056b3; /* 深藍色標題 */
+            margin: 0;
+            font-size: 2.2rem;
+            font-weight: 600;
+        }
+        .welcome-section {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .welcome-section p {
+            font-size: 1.1rem;
+            color: #555;
+        }
+        .news-section h2 {
+            color: #333;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 8px;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+        }
+        .news-article {
+            background-color: #f8f9fa;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 6px;
+            border-left: 4px solid #007bff; /* 左側強調線 */
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+        .news-article:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .news-article h3 {
+            margin-top: 0;
+            margin-bottom: 8px;
+            color: #0056b3;
+            font-size: 1.2rem;
+        }
+        .news-article p {
+            margin-bottom: 5px;
+            color: #495057;
+            font-size: 0.95rem;
+        }
+        .news-article .source {
+            font-size: 0.8rem;
+            color: #777;
+            font-style: italic;
+        }
+        .loading-news {
+            text-align: center;
+            padding: 20px;
+            color: #777;
+            font-style: italic;
+        }
+        footer {
+            text-align: center;
+            padding: 25px;
+            background-color: #343a40;
+            color: #f8f9fa;
+            font-size: 0.9rem;
+            margin-top: auto;
+        }
+        .language-switcher {
+            text-align: right;
+            margin-bottom: 15px;
+            font-size: 0.9em;
+        }
+        .language-switcher button {
+            background: none;
+            border: 1px solid #007bff;
+            color: #007bff;
+            padding: 5px 10px;
+            margin-left: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s, color 0.2s;
+        }
+        .language-switcher button:hover, .language-switcher button.active {
+            background-color: #007bff;
+            color: white;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="language-switcher">
+            <button id="lang-en">English</button>
+            <button id="lang-zh-CN">简体中文</button>
+            <button id="lang-zh-TW">繁體中文</button>
+        </div>
+        <header>
+            <h1 data-translate="portalTitle">资讯门户</h1>
+        </header>
+
+        <section class="welcome-section">
+            <p data-translate="welcomeMessage">欢迎访问我们的资讯平台。我们致力于提供最新、最相关的动态。</p>
+        </section>
+
+        <section class="news-section">
+            <h2 data-translate="latestNews">最新资讯</h2>
+            <div id="news-container">
+                <p class="loading-news" data-translate="loadingNews">正在加载资讯...</p>
+            </div>
+        </section>
+    </div>
+
+    <footer>
+        <p>&copy; <span id="current-year"></span> <span data-translate="footerText">资讯服务</span>. <span data-translate="rightsReserved">版权所有</span>.</p>
+    </footer>
+
+    <script>
+        // 翻譯文本
+        const translations = {
+            en: {
+                pageTitle: "Information Portal",
+                portalTitle: "Information Portal",
+                welcomeMessage: "Welcome to our information hub. We strive to provide the latest and most relevant updates.",
+                latestNews: "Latest Updates",
+                loadingNews: "Loading news...",
+                footerText: "Information Services",
+                rightsReserved: "All rights reserved",
+                news: [
+                    { title: "Global Tech Summit Concludes Successfully", content: "The annual Global Tech Summit ended today, featuring groundbreaking innovations and discussions on the future of technology.", source: "Tech Chronicle" },
+                    { title: "New Advances in Renewable Energy", content: "Researchers have announced a significant breakthrough in solar panel efficiency, promising more affordable and sustainable energy solutions.", source: "Eco News" },
+                    { title: "Exploring the Depths: Ocean Discovery", content: "A marine biology team has discovered several new species in the Pacific Ocean, highlighting the rich biodiversity of our planet.", source: "Science Today" }
+                ]
+            },
+            'zh-CN': {
+                pageTitle: "资讯门户",
+                portalTitle: "资讯门户",
+                welcomeMessage: "欢迎访问我们的资讯平台。我们致力于提供最新、最相关的动态。",
+                latestNews: "最新资讯",
+                loadingNews: "正在加载资讯...",
+                footerText: "资讯服务",
+                rightsReserved: "版权所有",
+                news: [
+                    { title: "全球科技峰会圆满结束", content: "年度全球科技峰会今日闭幕，展示了突破性的创新成果并探讨了科技的未来。", source: "科技纪事" },
+                    { title: "可再生能源取得新进展", content: "研究人员宣布在太阳能电池板效率方面取得重大突破，有望提供更经济、更可持续的能源解决方案。", source: "生态新闻" },
+                    { title: "探索深海：海洋新发现", content: "一支海洋生物学团队在太平洋发现了数个新物种，彰显了地球丰富的生物多样性。", source: "今日科学" }
+                ]
+            },
+            'zh-TW': {
+                pageTitle: "資訊入口",
+                portalTitle: "資訊入口",
+                welcomeMessage: "歡迎訪問我們的資訊平台。我們致力於提供最新、最相關的動態。",
+                latestNews: "最新資訊",
+                loadingNews: "正在載入資訊...",
+                footerText: "資訊服務",
+                rightsReserved: "版權所有",
+                news: [
+                    { title: "全球科技峰會圓滿結束", content: "年度全球科技峰會今日閉幕，展示了突破性的創新成果並探討了科技的未來。", source: "科技紀事" },
+                    { title: "可再生能源取得新進展", content: "研究人員宣布在太陽能電池板效率方面取得重大突破，有望提供更經濟、更可持續的能源解決方案。", source: "生態新聞" },
+                    { title: "探索深海：海洋新發現", content: "一支海洋生物學團隊在太平洋發現了數個新物種，彰顯了地球豐富的生物多樣性。", source: "今日科學" }
+                ]
+            }
+        };
+
+        let currentLang = 'en'; // 默認語言
+
+        function setLanguage(lang) {
+            if (!translations[lang]) {
+                console.warn(`Language ${lang} not supported. Falling back to English.`);
+                lang = 'en';
+            }
+            currentLang = lang;
+            document.documentElement.lang = currentLang.split('-')[0]; // 例如 'zh-CN' -> 'zh'
+
+            // 更新所有帶有 data-translate 屬性的元素
+            document.querySelectorAll('[data-translate]').forEach(el => {
+                const key = el.getAttribute('data-translate');
+                if (translations[currentLang] && translations[currentLang][key]) {
+                    el.textContent = translations[currentLang][key];
+                }
+            });
+            document.title = translations[currentLang].pageTitle || "Information Portal";
+
+            // 更新語言切換按鈕狀態
+            document.querySelectorAll('.language-switcher button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            const activeBtn = document.getElementById(`lang-${lang}`);
+            if (activeBtn) {
+                activeBtn.classList.add('active');
+            }
+            
+            loadNews(); // 重新加載新聞以匹配語言
+        }
+
+        function detectLanguage() {
+            const browserLang = navigator.language || navigator.userLanguage || 'en';
+            if (browserLang.startsWith('zh-CN')) {
+                return 'zh-CN';
+            } else if (browserLang.startsWith('zh-TW') || browserLang.startsWith('zh-HK') || browserLang.startsWith('zh')) {
+                // 如果是 'zh' 但不是 'zh-CN'，則默認為繁體
+                return 'zh-TW';
+            } else if (browserLang.startsWith('en')) {
+                return 'en';
+            }
+            return 'en'; // 默認回退到英文
+        }
+
+        function loadNews() {
+            const newsContainer = document.getElementById('news-container');
+            newsContainer.innerHTML = `<p class="loading-news">${translations[currentLang].loadingNews}</p>`; // 顯示加載提示
+
+            // 模擬延遲加載
+            setTimeout(() => {
+                newsContainer.innerHTML = ''; // 清空加載提示
+                const newsData = translations[currentLang].news || translations.en.news; // 如果當前語言沒有新聞，回退到英文新聞
+
+                if (newsData && newsData.length > 0) {
+                    newsData.forEach(article => {
+                        const articleElement = document.createElement('div');
+                        articleElement.classList.add('news-article');
+                        articleElement.innerHTML = `
+                            <h3>${article.title}</h3>
+                            <p>${article.content}</p>
+                            <p class="source">${article.source}</p>
+                        `;
+                        newsContainer.appendChild(articleElement);
+                    });
+                } else {
+                    newsContainer.innerHTML = `<p>${translations[currentLang].loadingNews.replace('...', ' currently unavailable.')}</p>`;
+                }
+            }, 500); // 模擬網絡請求延遲
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('current-year').textContent = new Date().getFullYear();
+            
+            const initialLang = detectLanguage();
+            setLanguage(initialLang);
+
+            document.getElementById('lang-en').addEventListener('click', () => setLanguage('en'));
+            document.getElementById('lang-zh-CN').addEventListener('click', () => setLanguage('zh-CN'));
+            document.getElementById('lang-zh-TW').addEventListener('click', () => setLanguage('zh-TW'));
+        });
+    </script>
+</body>
+</html>
