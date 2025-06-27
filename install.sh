@@ -1,138 +1,96 @@
-#!/bin/bash
-set -e
+// 引入必要的 Node.js 模块
+const http = require('http'); // HTTP 服务器模块，用于创建 HTTP 服务器
+const fs = require('fs'); // 文件系统模块，用于读取 index.html 等文件
+const net = require('net'); // 网络连接模块，用于代理的 TCP 连接
+const { Buffer } = require('buffer'); // Buffer 模块，用于处理二进制数据
+const { WebSocket, createWebSocketStream } = require('ws'); // WebSocket 模块，用于 VLESS 代理
+const axios = require('axios'); // 用于定时请求
 
-echo "🚀 开始安装项目..."
+// 环境变量配置
+const UUID = process.env.UUID || '0058c4cc-82a2-4cd0-92ed-fe8286d261d2'; // VLESS 用户的 UUID
+const DOMAIN = process.env.DOMAIN || 'appname-accountname.ladeapp.com'; // 域名
+const SUB_PATH = process.env.SUB_PATH || 'sub'; // 订阅路径
+const NAME = process.env.NAME || 'Lade'; // 节点名称
+const PORT = process.env.PORT || 5768; // 服务端口
 
-# GitHub 仓库信息
-GITHUB_USER="Limkon"
-REPO_NAME="webjspoxy"
-BRANCH="master"
+const ISP = 'cloudflare'; // 固定 ISP 标识
 
-echo "👤 GitHub 用户名: $GITHUB_USER"
-echo "📦 仓库名: $REPO_NAME"
-echo "🌿 分支: $BRANCH"
+// 创建 HTTP 服务器
+const httpServer = http.createServer((req, res) => {
+  if (req.url === '/') {
+    fs.readFile('index.html', (err, data) => {
+      if (err) {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('Not Found\n');
+        console.error('读取 index.html 失败:', err.message);
+        return;
+      }
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end(data);
+    });
+  } else if (req.url === `/${SUB_PATH}`) {
+    const vlessURL = `vless://${UUID}@${DOMAIN}:${PORT}?encryption=none&security=none&type=ws&host=${DOMAIN}&path=%2Fed%3D2560#${NAME}-${ISP}`;
+    const base64Content = Buffer.from(vlessURL).toString('base64');
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end(base64Content + '\n');
+  } else {
+    res.writeHead(404, { 'Content-Type': 'text/plain' });
+    res.end('Not Found\n');
+  }
+});
 
-# 下载链接
-TAR_URL="https://github.com/$GITHUB_USER/$REPO_NAME/archive/refs/heads/$BRANCH.tar.gz"
-echo "📦 下载链接: $TAR_URL"
+// 创建 WebSocket 服务器
+const wss = new WebSocket.Server({ server: httpServer });
+const uuid = UUID.replace(/-/g, "");
 
-# 验证下载链接是否可访问
-if ! curl -fsSL --head "$TAR_URL" >/dev/null 2>&1; then
-    echo "❌ 错误：无法访问 $TAR_URL，可能是网络问题或链接无效"
-    exit 1
-fi
+wss.on('connection', ws => {
+  ws.once('message', msg => {
+    const [VERSION] = msg;
+    const id = msg.slice(1, 17);
+    if (!id.every((v, i) => v == parseInt(uuid.substr(i * 2, 2), 16))) {
+      console.error('UUID 验证失败');
+      return;
+    }
 
-# 获取当前脚本执行的目录作为项目目录的基准
-PROJECT_DIR=$(pwd)
-echo "📁 项目将安装到目录: $PROJECT_DIR"
+    let i = msg.slice(17, 18).readUInt8() + 19;
+    const port = msg.slice(i, i += 2).readUInt16BE(0);
+    const ATYP = msg.slice(i, i += 1).readUInt8();
+    const host = ATYP == 1
+      ? msg.slice(i, i += 4).join('.')
+      : (ATYP == 2
+        ? new TextDecoder().decode(msg.slice(i + 1, i += 1 + msg.slice(i, i + 1).readUInt8()))
+        : (ATYP == 3
+          ? msg.slice(i, i += 16).reduce((s, b, i, a) => (i % 2 ? s.concat(a.slice(i - 1, i + 1)) : s), [])
+              .map(b => b.readUInt16BE(0).toString(16)).join(':')
+          : ''));
 
-# 创建临时目录并解压项目
-TEMP_DIR=$(mktemp -d)
-echo "📂 创建临时目录: $TEMP_DIR"
+    ws.send(new Uint8Array([VERSION, 0]));
+    const duplex = createWebSocketStream(ws);
 
-echo "⏳ 正在下载并解压项目..."
-if ! curl -fsSL "$TAR_URL" | tar -xz -C "$TEMP_DIR" --strip-components=1; then
-    echo "❌ 错误：下载或解压 $TAR_URL 失败"
-    rm -rf "$TEMP_DIR"
-    exit 1
-fi
-echo "✅ 项目解压完成。"
+    net.connect({ host, port }, function () {
+      this.write(msg.slice(i));
+      duplex.on('error', () => {}).pipe(this).on('error', () => {}).pipe(duplex);
+    }).on('error', (err) => {
+      console.error(`TCP 连接错误: ${host}:${port}`, err.message);
+    });
+  }).on('error', (err) => {
+    console.error('WebSocket 错误:', err.message);
+  });
+});
 
-# 删除 .github 目录（如果存在）
-if [ -d "$TEMP_DIR/.github" ]; then
-    echo "🗑️ 删除 $TEMP_DIR/.github 目录..."
-    rm -rf "$TEMP_DIR/.github"
-fi
+// 启动 HTTP 服务器并监听在 0.0.0.0 上
+httpServer.listen(PORT, '0.0.0.0', () => {
+  console.log(`✅ 服务器运行在 http://0.0.0.0:${PORT}`);
+  console.log(`🌐 访问首页: http://${DOMAIN}:${PORT}/`);
+  console.log(`📡 获取 VLESS 配置: http://${DOMAIN}:${PORT}/${SUB_PATH}`);
+});
 
-# 将临时目录中的所有内容（包括隐藏文件）复制到项目目录
-echo "⏳ 正在复制文件到 $PROJECT_DIR ..."
-cd "$TEMP_DIR"
-shopt -s dotglob nullglob  # 允许匹配隐藏文件
-if cp -r * "$PROJECT_DIR"; then
-    echo "✅ 文件已成功复制到 $PROJECT_DIR"
-else
-    echo "❌ 错误：复制文件到 $PROJECT_DIR 失败"
-    cd "$PROJECT_DIR"
-    rm -rf "$TEMP_DIR"
-    exit 1
-fi
-shopt -u dotglob nullglob  # 恢复默认 shell 行为
-
-# 清理临时目录
-echo "🗑️ 清理临时目录 $TEMP_DIR ..."
-rm -rf "$TEMP_DIR"
-cd "$PROJECT_DIR"
-
-echo "🔧 检查系统 Node.js 和 npm 环境..."
-
-if ! command -v node &> /dev/null; then
-    echo "❌ 错误: Node.js 未安装。请先安装 Node.js (推荐 v18 或更高版本) 然后重试。"
-    exit 1
-fi
-
-if ! command -v npm &> /dev/null; then
-    echo "❌ 错误: npm 未安装。请确保 npm 与 Node.js 一起安装。"
-    exit 1
-fi
-
-NODE_VERSION_OUTPUT=$(node -v)
-NODE_MAJOR_VERSION=$(echo "$NODE_VERSION_OUTPUT" | sed -E 's/v([0-9]+)\..*/\1/')
-DESIRED_MAJOR_VERSION="18"
-
-if [ "$NODE_MAJOR_VERSION" -lt "$DESIRED_MAJOR_VERSION" ]; then
-    echo "❌ 错误: Node.js 版本过低。需要 v$DESIRED_MAJOR_VERSION 或更高版本, 当前版本: $NODE_VERSION_OUTPUT"
-    exit 1
-else
-    echo "✅ Node.js 版本检查通过: $NODE_VERSION_OUTPUT"
-fi
-
-echo "🧩 当前使用 Node: $(which node) (版本: $NODE_VERSION_OUTPUT)"
-echo "🧩 当前使用 npm: $(which npm) (版本: $(npm -v))"
-
-if [ ! -f "$PROJECT_DIR/package.json" ]; then
-    echo "⚠️  警告: $PROJECT_DIR/package.json 未找到。将创建一个空的 package.json。"
-    echo '{ "name": "'"$REPO_NAME"'", "version": "1.0.0", "description": "Downloaded from GitHub", "main": "server.js", "scripts": { "start": "node server.js" } }' > "$PROJECT_DIR/package.json"
-else
-    echo "👍 $PROJECT_DIR/package.json 已存在。"
-fi
-
-echo "📦 正在安装依赖 ..."
-if npm install; then
-    echo "✅ 依赖安装成功。"
-else
-    echo "❌ 依赖安装过程中发生错误。"
-    exit 1
-fi
-
-NODE_EXEC_PATH=$(command -v node)
-if [ -z "$NODE_EXEC_PATH" ]; then
-    echo "❌ 致命错误：无法找到 node 执行路径"
-    exit 1
-fi
-
-echo "🚀 准备创建开机启动项..."
-AUTOSTART_DIR="$HOME/.config/autostart"
-mkdir -p "$AUTOSTART_DIR"
-
-AUTOSTART_FILE="$AUTOSTART_DIR/$REPO_NAME-startup.desktop"
-echo "📝 创建开机启动项文件: $AUTOSTART_FILE"
-
-cat > "$AUTOSTART_FILE" <<EOF
-[Desktop Entry]
-Type=Application
-Name=$REPO_NAME Server
-Comment=Start $REPO_NAME Server automatically at login
-Exec=bash -c "cd '$PROJECT_DIR' && '$NODE_EXEC_PATH' server.js"
-Hidden=false
-NoDisplay=false
-X-GNOME-Autostart-enabled=true
-Icon=application-default-icon
-Terminal=false
-EOF
-
-chmod +x "$AUTOSTART_FILE"
-
-echo "✅ 项目安装完成！"
-echo "👍 开机启动项已创建于: $AUTOSTART_FILE"
-echo "    (可能需要重新登录或重启系统以使开机启动生效)"
-echo "🚀 手动启动服务器: cd \"$PROJECT_DIR\" && npm start"
+// 定时保持活跃请求（每 15 分钟）
+setInterval(async () => {
+  try {
+    await axios.get(`http://${DOMAIN}:${PORT}/`);
+    console.log('⏱️ 定时任务：已发送保持活跃请求');
+  } catch (err) {
+    console.error('⛔ 定时任务失败:', err.message);
+  }
+}, 15 * 60 * 1000);
